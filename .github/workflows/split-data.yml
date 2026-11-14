@@ -1,0 +1,55 @@
+name: Split Data (NISN & Kelas)
+
+# Jalan otomatis setiap kali dsgan.js atau kalgan.js berubah (misal dari Apps Script),
+# setiap kali skrip pemecah berubah, atau saat src/index.src.html berubah
+# (key enkripsi & nama file data diturunkan dari _SP5P_KEY di sana).
+# Bisa juga dijalankan manual lewat tab "Actions" di GitHub.
+# Catatan: workflow ini berjalan di GitHub, TIDAK memakai kuota "Requests today" Cloudflare.
+on:
+  push:
+    paths:
+      - 'dsgan.js'
+      - 'kalgan.js'
+      - 'scripts/**'
+      - 'src/index.src.html'
+  workflow_dispatch:
+
+# Kalau Apps Script mengirim data berkali-kali, proses dijalankan satu per satu
+concurrency:
+  group: split-data
+  cancel-in-progress: false
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Split dsgan.js -> data/nisn/*.js
+        run: node scripts/split-dsgan.js dsgan.js data/nisn
+
+      - name: Split kalgan.js -> data/kelas/*.js
+        run: node scripts/split-kalgan.js kalgan.js data/kelas
+
+      - name: Commit & push hasil split
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # -A supaya file lama yang dihapus split-dsgan.js (nama NISN mentah) ikut terhapus di repo
+          git add -A data/nisn data/kelas
+          if git diff --staged --quiet; then
+            echo "Tidak ada perubahan data."
+          else
+            # Tanpa [skip ci] supaya Cloudflare Pages ikut deploy ulang membawa data terbaru
+            git commit -m "Auto: pecah data nisn & kelas"
+            git pull --rebase
+            git push
+          fi
