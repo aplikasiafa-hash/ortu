@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.wrangler/
+# dibuat otomatis oleh build.mjs (berisi config terenkripsi untuk Worker)
+edge/config.gen.js
